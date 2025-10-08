@@ -49,9 +49,9 @@ bash API.sh
 ```
 ✅ Searching for users with 'CPP Module 09' = 100
 Fetching page 1...
-  Checking hnagashi...
-  Checking rkawahar...
-CPP Module 09 (hnagashi)
+  Checking intra_name1...
+  Checking intra_name2...
+CPP Module 09 (intra_name1)
 Fetching page 2...
 ✅ Done! Results saved to reviewer.txt
 ```
@@ -59,8 +59,7 @@ Fetching page 2...
 `reviewer.txt` の中身：
 
 ```
-CPP Module 09 (hnagashi)
-CPP Module 09 (yumatsui)
+CPP Module 09 (intra_name1)
 ```
 
 ---
@@ -75,8 +74,6 @@ CPP Module 09 (yumatsui)
 
 ## ⚠️ 注意
 
-* `.env` には **機密情報（APIキー）** が含まれるため、
-  `.gitignore` に登録して **GitHubに絶対アップロードしないでください。**
 * 42 APIの仕様により、1分間あたりのリクエスト数に制限があります。
   連続実行時は少し間をあけてください。
 

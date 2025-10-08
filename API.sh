@@ -27,7 +27,7 @@ OUTPUT_FILE="reviewer.txt"
 
 echo "✅ Searching for users with '${PROJECT_NAME}' = 100"
 
-# --- 校舎内ログイン中の人を30ページ分チェック ---
+# --- 校舎内ログイン中の人を100ページ分チェック ---
 for i in {1..100}; do
   echo "Fetching page $i..."
 

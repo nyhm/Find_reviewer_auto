@@ -98,7 +98,7 @@ async function getActiveUsers(token) {
           'Authorization': `Bearer ${token}`,
           'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
         },
-        timeout: 15000
+        timeout: 30000  // 30秒に延長
       }
     );
     

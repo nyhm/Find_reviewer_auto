@@ -18,14 +18,34 @@ const CACHE_DURATION = 5 * 60 * 1000; //5分
 // トークン取得関数
 async function getAccessToken() {
   try {
+    // デバッグ：環境変数の読み込み確認
+    const uid = process.env.U_ID;
+    const secret = process.env.SECRET;
+    
+    console.log('🔐 環境変数チェック:');
+    console.log(`   U_ID: ${uid ? uid.substring(0, 15) + '...' : '❌ 未設定'}`);
+    console.log(`   SECRET: ${secret ? secret.substring(0, 15) + '...' : '❌ 未設定'}`);
+    console.log(`   U_ID長さ: ${uid ? uid.length : 0}文字`);
+    console.log(`   SECRET長さ: ${secret ? secret.length : 0}文字`);
+    
+    if (!uid || !secret) {
+      throw new Error('環境変数U_IDまたはSECRETが設定されていません');
+    }
+    
     const response = await axios.post('https://api.intra.42.fr/oauth/token', {
       grant_type: 'client_credentials',
-      client_id: process.env.U_ID,
-      client_secret: process.env.SECRET
+      client_id: uid,
+      client_secret: secret
     });
+    
+    console.log('✅ トークン取得成功\n');
     return response.data.access_token;
   } catch (error) {
-    console.error('トークン取得エラー:', error.message);
+    console.error('❌ トークン取得エラー:', error.message);
+    if (error.response) {
+      console.error('   ステータス:', error.response.status);
+      console.error('   レスポンス:', error.response.data);
+    }
     throw error;
   }
 }

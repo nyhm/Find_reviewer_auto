@@ -102,9 +102,9 @@ async function getActiveUsers(token) {
       }
     );
     
-    // user != null かつ end_at == null（現在ログイン中）の人のみ
+    // user != null かつ end_at がない（現在ログイン中）の人のみ
     const activeLogins = response.data
-      .filter(location => location.user !== null && location.end_at === null)
+      .filter(location => location.user !== null && !location.end_at)
       .map(location => location.user.login);
     
     // 重複を削除

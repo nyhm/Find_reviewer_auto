@@ -388,14 +388,15 @@ app.get('/api/reviewers/:projectName', async (req, res) => {
       );
       
       if (completedProject) {
-        // EXAMチェック：Exam Rank 02以上がfinishedかチェック
+        // EXAMチェック：Exam Rank 02以上がfinishedかつ100点以上かチェック
         const hasExam = user.projects.some(
           p => (p.project.name === 'Exam Rank 02' || 
                 p.project.name === 'Exam Rank 03' ||
                 p.project.name === 'Exam Rank 04' ||
                 p.project.name === 'Exam Rank 05' ||
                 p.project.name === 'Exam Rank 06') &&
-               p.status === 'finished'
+               p.status === 'finished' &&
+               p.final_mark >= 100
         );
         
         reviewers.push({

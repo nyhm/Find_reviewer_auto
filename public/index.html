@@ -85,9 +85,10 @@
                 現在校舎にログイン中の学生から、選択した課題が<strong>一度でも終わっている人（finished）</strong>を表示します
             </p>
             <p class="note">
-                ✅ statusが"finished"なら点数に関係なく表示 | 
+                ✅ 課題が"finished"なら点数に関係なく表示 | 
+                🎓 EXAM判定: Exam Rank 02以上が100点以上でクリア済み | 
                 📝 任意の課題名も入力可能 | 
-                ⚡️ 初回検索時にキャッシュを作成(全員を調べるので時間がかかります)キャッシュがあると検索は数ミリ秒で完了
+                ⚡️ キャッシュは10分間有効、検索は数ミリ秒で完了
             </p>
         </footer>
     </div>
@@ -142,10 +143,12 @@
                     // キャッシュ完成
                     const lastUpdated = new Date(data.lastUpdated);
                     const timeStr = lastUpdated.toLocaleTimeString('ja-JP');
+                    const expiresInMin = Math.floor(data.expiresIn / 60000);
+                    const expiresText = expiresInMin > 0 ? `あと${expiresInMin}分有効` : '期限切れ';
                     statusDiv.innerHTML = `
                         📊 キャッシュ: <strong>${data.userCount}人</strong> 
                         (${data.totalProjects}プロジェクト)
-                        | 更新: ${timeStr}
+                        | 更新: ${timeStr} | ${expiresText}
                     `;
                     statusDiv.style.display = 'block';
                 } else {
@@ -258,12 +261,19 @@
                     
                     const validated = reviewer.validated ? '✅' : '';
                     const statusBadge = '<span class="status-finished">完了</span>';
-                    const examBadge = reviewer.hasExam ? '<span class="exam-badge">EXAM✓</span>' : '<span class="no-exam-badge">EXAM未</span>';
+                    const examBadge = reviewer.hasExam ? 
+                        '<span class="exam-badge">EXAM✓</span>' : 
+                        '<span class="no-exam-badge">EXAM未</span>';
+                    const locationBadge = reviewer.location ? 
+                        `<span class="location-badge">📍 ${reviewer.location}</span>` : '';
                     
                     card.innerHTML = `
                         <div class="reviewer-info">
                             <div class="reviewer-login">${reviewer.login}</div>
-                            ${examBadge}
+                            <div class="badges">
+                                ${examBadge}
+                                ${locationBadge}
+                            </div>
                         </div>
                         <div class="reviewer-score">
                             ${statusBadge} ${validated} ${reviewer.finalMark}点

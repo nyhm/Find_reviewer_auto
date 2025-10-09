@@ -276,6 +276,21 @@ button:disabled {
     font-weight: 600;
 }
 
+.location-badge {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.badges {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
 .no-results {
     text-align: center;
     padding: 40px;

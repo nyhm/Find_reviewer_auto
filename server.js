@@ -15,36 +15,58 @@ let cachedUsersWithProjects = []; // { login: string, projects: array }
 let cacheLastUpdated = null;
 const CACHE_DURATION = 5 * 60 * 1000; //5分
 
-// トークン取得関数
-async function getAccessToken() {
+// トークン取得関数（リトライロジック付き）
+async function getAccessToken(retryCount = 0) {
   try {
     // デバッグ：環境変数の読み込み確認
     const uid = process.env.U_ID;
     const secret = process.env.SECRET;
     
-    console.log('🔐 環境変数チェック:');
-    console.log(`   U_ID: ${uid ? uid.substring(0, 15) + '...' : '❌ 未設定'}`);
-    console.log(`   SECRET: ${secret ? secret.substring(0, 15) + '...' : '❌ 未設定'}`);
-    console.log(`   U_ID長さ: ${uid ? uid.length : 0}文字`);
-    console.log(`   SECRET長さ: ${secret ? secret.length : 0}文字`);
+    if (retryCount === 0) {
+      console.log('🔐 環境変数チェック:');
+      console.log(`   U_ID: ${uid ? uid.substring(0, 15) + '...' : '❌ 未設定'}`);
+      console.log(`   SECRET: ${secret ? secret.substring(0, 15) + '...' : '❌ 未設定'}`);
+      console.log(`   U_ID長さ: ${uid ? uid.length : 0}文字`);
+      console.log(`   SECRET長さ: ${secret ? secret.length : 0}文字`);
+    }
     
     if (!uid || !secret) {
       throw new Error('環境変数U_IDまたはSECRETが設定されていません');
     }
     
-    const response = await axios.post('https://api.intra.42.fr/oauth/token', {
-      grant_type: 'client_credentials',
-      client_id: uid,
-      client_secret: secret
-    });
+    const response = await axios.post('https://api.intra.42.fr/oauth/token', 
+      `grant_type=client_credentials&client_id=${uid}&client_secret=${secret}`,
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        },
+        timeout: 10000
+      }
+    );
     
     console.log('✅ トークン取得成功\n');
     return response.data.access_token;
   } catch (error) {
-    console.error('❌ トークン取得エラー:', error.message);
+    console.error(`❌ トークン取得エラー (試行${retryCount + 1}/3):`, error.message);
+    
+    // Cloudflareチャレンジの検出
+    if (error.response && error.response.data && 
+        typeof error.response.data === 'string' && 
+        error.response.data.includes('Just a moment')) {
+      console.error('   ⚠️  Cloudflareチャレンジが検出されました');
+    }
+    
+    // リトライロジック（最大3回）
+    if (retryCount < 2 && error.response && error.response.status === 403) {
+      const waitTime = (retryCount + 1) * 2000; // 2秒、4秒
+      console.log(`   ⏳ ${waitTime/1000}秒後に再試行します...`);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+      return getAccessToken(retryCount + 1);
+    }
+    
     if (error.response) {
       console.error('   ステータス:', error.response.status);
-      console.error('   レスポンス:', error.response.data);
     }
     throw error;
   }
@@ -60,7 +82,11 @@ async function getActiveUsers(token) {
       const response = await axios.get(
         `https://api.intra.42.fr/v2/campus/26/users?page=${page}&per_page=100`,
         {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { 
+            'Authorization': `Bearer ${token}`,
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+          },
+          timeout: 15000
         }
       );
       
@@ -133,7 +159,11 @@ async function getUserProjects(token, login) {
     const response = await axios.get(
       `https://api.intra.42.fr/v2/users/${login}/projects_users?per_page=100`,
       {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+        },
+        timeout: 15000
       }
     );
     return response.data;

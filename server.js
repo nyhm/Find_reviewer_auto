@@ -124,8 +124,8 @@ async function getActiveUsers(token) {
       users.push(...activeUsers);
       console.log(`   ページ ${page}: ${activeUsers.length}人 (42Tokyo)`);
       
-      // レート制限対策（429エラー対策）
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // レート制限対策（429エラー対策）- ページ取得の間隔
+      await new Promise(resolve => setTimeout(resolve, 600));
     }
     console.log(`✅ 合計 ${users.length}人のアクティブユーザーを取得`);
   } catch (error) {
@@ -192,8 +192,8 @@ async function updateCache() {
           console.log(`  ⚠️  ${login} は42Tokyo以外のキャンパス - スキップ`);
         }
         
-        // レート制限対策（429エラー対策）
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // レート制限対策（429エラー対策）- 間隔を長めに
+        await new Promise(resolve => setTimeout(resolve, 800));
       }
       
       // 進捗をリセット
@@ -232,8 +232,8 @@ function isCacheValid() {
   return (now - cacheLastUpdated) < CACHE_DURATION;
 }
 
-// ユーザーのプロジェクト情報を取得
-async function getUserProjects(token, login) {
+// ユーザーのプロジェクト情報を取得（429エラー時リトライ付き）
+async function getUserProjects(token, login, retryCount = 0) {
   try {
     const response = await axios.get(
       `https://api.intra.42.fr/v2/users/${login}/projects_users?per_page=100`,
@@ -247,13 +247,21 @@ async function getUserProjects(token, login) {
     );
     return response.data;
   } catch (error) {
+    // 429エラー時はリトライ
+    if (error.response?.status === 429 && retryCount < 3) {
+      const waitTime = (retryCount + 1) * 2000; // 2秒、4秒、6秒
+      console.log(`  ⏳ ${login}: 429エラー - ${waitTime/1000}秒待機してリトライ...`);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+      return getUserProjects(token, login, retryCount + 1);
+    }
+    
     console.error(`${login}のプロジェクト取得エラー:`, error.message);
     return [];
   }
 }
 
-// ユーザーの詳細情報を取得
-async function getUserDetails(token, login) {
+// ユーザーの詳細情報を取得（429エラー時リトライ付き）
+async function getUserDetails(token, login, retryCount = 0) {
   try {
     const response = await axios.get(
       `https://api.intra.42.fr/v2/users/${login}`,
@@ -279,6 +287,14 @@ async function getUserDetails(token, login) {
       campus_id: tokyoCampus ? 26 : null
     };
   } catch (error) {
+    // 429エラー時はリトライ
+    if (error.response?.status === 429 && retryCount < 3) {
+      const waitTime = (retryCount + 1) * 2000; // 2秒、4秒、6秒
+      console.log(`  ⏳ ${login}: 429エラー - ${waitTime/1000}秒待機してリトライ...`);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+      return getUserDetails(token, login, retryCount + 1);
+    }
+    
     console.error(`${login}の詳細取得エラー:`, error.message);
     return { image: null, location: null, displayname: login, campus_id: null };
   }

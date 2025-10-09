@@ -124,8 +124,8 @@ async function getActiveUsers(token) {
       users.push(...activeUsers);
       console.log(`   ページ ${page}: ${activeUsers.length}人 (42Tokyo)`);
       
-      // レート制限対策（429エラー対策）- ページ取得の間隔
-      await new Promise(resolve => setTimeout(resolve, 600));
+      // レート制限対策（429エラー対策）- ページ取得の間隔を大幅延長
+      await new Promise(resolve => setTimeout(resolve, 1000));
     }
     console.log(`✅ 合計 ${users.length}人のアクティブユーザーを取得`);
   } catch (error) {
@@ -192,8 +192,8 @@ async function updateCache() {
           console.log(`  ⚠️  ${login} は42Tokyo以外のキャンパス - スキップ`);
         }
         
-        // レート制限対策（429エラー対策）- 間隔を長めに
-        await new Promise(resolve => setTimeout(resolve, 800));
+        // レート制限対策（429エラー対策）- 間隔を大幅延長
+        await new Promise(resolve => setTimeout(resolve, 1500));
       }
       
       // 進捗をリセット
@@ -247,9 +247,9 @@ async function getUserProjects(token, login, retryCount = 0) {
     );
     return response.data;
   } catch (error) {
-    // 429エラー時はリトライ
+    // 429エラー時はリトライ（待機時間を大幅延長）
     if (error.response?.status === 429 && retryCount < 3) {
-      const waitTime = (retryCount + 1) * 2000; // 2秒、4秒、6秒
+      const waitTime = (retryCount + 1) * 5000; // 5秒、10秒、15秒
       console.log(`  ⏳ ${login}: 429エラー - ${waitTime/1000}秒待機してリトライ...`);
       await new Promise(resolve => setTimeout(resolve, waitTime));
       return getUserProjects(token, login, retryCount + 1);
@@ -287,9 +287,9 @@ async function getUserDetails(token, login, retryCount = 0) {
       campus_id: tokyoCampus ? 26 : null
     };
   } catch (error) {
-    // 429エラー時はリトライ
+    // 429エラー時はリトライ（待機時間を大幅延長）
     if (error.response?.status === 429 && retryCount < 3) {
-      const waitTime = (retryCount + 1) * 2000; // 2秒、4秒、6秒
+      const waitTime = (retryCount + 1) * 5000; // 5秒、10秒、15秒
       console.log(`  ⏳ ${login}: 429エラー - ${waitTime/1000}秒待機してリトライ...`);
       await new Promise(resolve => setTimeout(resolve, waitTime));
       return getUserDetails(token, login, retryCount + 1);

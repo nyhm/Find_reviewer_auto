@@ -167,19 +167,14 @@ async function updateCache() {
         const projects = await getUserProjects(token, login);
         const userDetails = await getUserDetails(token, login);
         
-        // 42Tokyoキャンパスの人のみを新しいキャッシュに追加
-        if (userDetails.campus_id === 26 || userDetails.location) {
-          newCache.push({
-            login: login,
-            projects: projects,
-            image: userDetails.image,
-            location: userDetails.location,
-            displayName: userDetails.displayname || userDetails.usual_full_name || login,
-            campus_id: userDetails.campus_id
-          });
-        } else {
-          console.log(`  ⚠️  ${login} は42Tokyo以外のキャンパス - スキップ`);
-        }
+        // locationsエンドポイントで取得した人は確実に42Tokyoにいるのでそのまま追加
+        newCache.push({
+          login: login,
+          projects: projects,
+          image: userDetails.image,
+          location: userDetails.location,
+          displayName: userDetails.displayname || userDetails.usual_full_name || login
+        });
         
         // レート制限対策
         await new Promise(resolve => setTimeout(resolve, 700));

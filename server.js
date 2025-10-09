@@ -18,7 +18,7 @@ const CACHE_DURATION = 10 * 60 * 1000; //10分
 // キャッシュ作成中のロック機構
 let isCacheUpdating = false;
 let cacheUpdatePromise = null;
-let cacheProgress = { current: 0, total: 0, message: '' };
+let cacheProgress = { phase: '', current: 0, total: 0, message: '' };
 
 // トークン取得関数（リトライロジック付き）
 async function getAccessToken(retryCount = 0) {
@@ -82,8 +82,17 @@ async function getActiveUsers(token) {
   const users = [];
   try {
     console.log('📡 校舎内のユーザー情報を取得中...');
+    
+    // 進捗表示の初期化
+    cacheProgress.phase = 'pages';
+    cacheProgress.total = 30; // 予想される最大ページ数
+    cacheProgress.current = 0;
+    
     // 最初の数ページのみ取得（処理時間短縮のため）
     for (let page = 1; page <= 100; page++) {
+      cacheProgress.current = page;
+      cacheProgress.message = `ページ ${page} を取得中...`;
+      
       const response = await axios.get(
         `https://api.intra.42.fr/v2/campus/26/users?page=${page}&per_page=100`,
         {
@@ -140,7 +149,10 @@ async function updateCache() {
       console.log(`\n📋 各ユーザーのプロジェクト情報を取得中...`);
       const usersWithProjects = [];
       
+      // フェーズをユーザー情報取得に切り替え
+      cacheProgress.phase = 'users';
       cacheProgress.total = activeUserLogins.length;
+      cacheProgress.current = 0;
       
       for (let i = 0; i < activeUserLogins.length; i++) {
         const login = activeUserLogins[i];
@@ -165,6 +177,8 @@ async function updateCache() {
         await new Promise(resolve => setTimeout(resolve, 500));
       }
       
+      // 進捗をリセット
+      cacheProgress.phase = '';
       cacheProgress.current = 0;
       cacheProgress.total = 0;
       cacheProgress.message = '';

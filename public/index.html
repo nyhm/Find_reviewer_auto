@@ -319,6 +319,21 @@
             if (progress.total > 0) {
                 const percentage = (progress.current / progress.total) * 100;
                 progressBarFill.style.width = percentage + '%';
+                
+                // フェーズに応じてタイトルを変更
+                let phaseTitle = '';
+                if (progress.phase === 'pages') {
+                    phaseTitle = '📄 ページ取得中';
+                } else if (progress.phase === 'users') {
+                    phaseTitle = '👤 ユーザー情報取得中';
+                }
+                
+                // タイトルを更新
+                const titleElement = progressDiv.querySelector('h3');
+                if (titleElement && phaseTitle) {
+                    titleElement.textContent = phaseTitle;
+                }
+                
                 progressText.textContent = `${progress.current} / ${progress.total}`;
                 progressMessage.textContent = progress.message;
                 progressDiv.style.display = 'block';

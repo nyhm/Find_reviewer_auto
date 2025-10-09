@@ -337,8 +337,9 @@ app.get('/api/reviewers/:projectName', async (req, res) => {
 });
 
 // サーバー起動
-app.listen(PORT, async () => {
-  console.log(`\n🚀 サーバーが起動しました: http://localhost:${PORT}`);
+const HOST = process.env.HOST || '0.0.0.0';
+app.listen(PORT, HOST, async () => {
+  console.log(`\n🚀 サーバーが起動しました: http://${HOST}:${PORT}`);
   console.log(`📍 42Tokyo レビュワー検索システム\n`);
   
   // 初回キャッシュ作成（失敗してもサーバーは起動）

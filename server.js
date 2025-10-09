@@ -106,12 +106,23 @@ async function getActiveUsers(token) {
       
       if (response.data.length === 0) break;
       
+      // 42Tokyo（campus 26）にいるユーザーのみを抽出
       const activeUsers = response.data
-        .filter(user => user.location !== null)
+        .filter(user => {
+          // locationがnullでないことを確認
+          if (!user.location) return false;
+          
+          // campus_usersから42Tokyo（id: 26）にいることを確認
+          const tokyoCampus = user.campus_users?.find(cu => cu.campus_id === 26);
+          if (!tokyoCampus) return false;
+          
+          // is_primaryがtrueまたはlocationに実際に値があることを確認
+          return tokyoCampus.is_primary || user.location;
+        })
         .map(user => user.login);
       
       users.push(...activeUsers);
-      console.log(`   ページ ${page}: ${activeUsers.length}人`);
+      console.log(`   ページ ${page}: ${activeUsers.length}人 (42Tokyo)`);
       
       // レート制限対策（429エラー対策）
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -165,13 +176,19 @@ async function updateCache() {
         // ユーザーの詳細情報も取得
         const userDetails = await getUserDetails(token, login);
         
-        usersWithProjects.push({
-          login: login,
-          projects: projects,
-          image: userDetails.image,
-          location: userDetails.location,
-          displayName: userDetails.displayname || userDetails.usual_full_name || login
-        });
+        // 42Tokyoキャンパスの人のみをキャッシュに追加
+        if (userDetails.campus_id === 26 || userDetails.location) {
+          usersWithProjects.push({
+            login: login,
+            projects: projects,
+            image: userDetails.image,
+            location: userDetails.location,
+            displayName: userDetails.displayname || userDetails.usual_full_name || login,
+            campus_id: userDetails.campus_id
+          });
+        } else {
+          console.log(`  ⚠️  ${login} は42Tokyo以外のキャンパス - スキップ`);
+        }
         
         // レート制限対策（429エラー対策）
         await new Promise(resolve => setTimeout(resolve, 500));
@@ -245,17 +262,22 @@ async function getUserDetails(token, login) {
         timeout: 15000
       }
     );
+    
+    // 42Tokyoキャンパスの情報を取得
+    const tokyoCampus = response.data.campus_users?.find(cu => cu.campus_id === 26);
+    
     return {
       image: response.data.image?.versions?.medium || response.data.image?.link,
       location: response.data.location,
       displayname: response.data.displayname,
       usual_full_name: response.data.usual_full_name,
       pool_month: response.data.pool_month,
-      pool_year: response.data.pool_year
+      pool_year: response.data.pool_year,
+      campus_id: tokyoCampus ? 26 : null
     };
   } catch (error) {
     console.error(`${login}の詳細取得エラー:`, error.message);
-    return { image: null, location: null, displayname: login };
+    return { image: null, location: null, displayname: login, campus_id: null };
   }
 }
 
@@ -390,13 +412,22 @@ app.get('/api/reviewers/:projectName', async (req, res) => {
       if (completedProject) {
         // EXAMチェック：Exam Rank 02以上がfinishedかつ100点以上かチェック
         const hasExam = user.projects.some(
-          p => (p.project.name === 'Exam Rank 02' || 
-                p.project.name === 'Exam Rank 03' ||
-                p.project.name === 'Exam Rank 04' ||
-                p.project.name === 'Exam Rank 05' ||
-                p.project.name === 'Exam Rank 06') &&
-               p.status === 'finished' &&
-               p.final_mark >= 100
+          p => {
+            const isExam = p.project.name === 'Exam Rank 02' || 
+                          p.project.name === 'Exam Rank 03' ||
+                          p.project.name === 'Exam Rank 04' ||
+                          p.project.name === 'Exam Rank 05' ||
+                          p.project.name === 'Exam Rank 06';
+            const isFinished = p.status === 'finished';
+            const hasPassingScore = p.final_mark >= 100;
+            
+            // デバッグログ
+            if (isExam && isFinished) {
+              console.log(`  EXAM判定 ${user.login}: ${p.project.name} = ${p.final_mark}点 (${hasPassingScore ? 'クリア' : '不合格'})`);
+            }
+            
+            return isExam && isFinished && hasPassingScore;
+          }
         );
         
         reviewers.push({

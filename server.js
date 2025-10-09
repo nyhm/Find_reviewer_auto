@@ -86,43 +86,33 @@ async function getActiveUsers(token) {
     
     // 進捗表示の初期化
     cacheProgress.phase = 'pages';
-    cacheProgress.total = 30; // 予想される最大ページ数
+    cacheProgress.total = 1; // locationsエンドポイントは1回のみ
     cacheProgress.current = 0;
+    cacheProgress.message = '校舎の席情報を取得中...';
     
-    // ページを順次取得
-    for (let page = 1; page <= 100; page++) {
-      cacheProgress.current = page;
-      cacheProgress.message = `ページ ${page} を取得中...`;
-      
-      const response = await axios.get(
-        `https://api.intra.42.fr/v2/campus/26/users?page=${page}&per_page=100`,
-        {
-          headers: { 
-            'Authorization': `Bearer ${token}`,
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
-          },
-          timeout: 15000
-        }
-      );
-      
-      if (response.data.length === 0) break;
-      
-      // 42Tokyo（campus 26）にいるユーザーのみを抽出
-      const activeUsers = response.data
-        .filter(user => {
-          if (!user.location) return false;
-          const tokyoCampus = user.campus_users?.find(cu => cu.campus_id === 26);
-          if (!tokyoCampus) return false;
-          return tokyoCampus.is_primary || user.location;
-        })
-        .map(user => user.login);
-      
-      users.push(...activeUsers);
-      console.log(`   ページ ${page}: ${activeUsers.length}人 (42Tokyo)`);
-      
-      // レート制限対策
-      await new Promise(resolve => setTimeout(resolve, 500));
-    }
+    // locationsエンドポイントから現在校舎にいる人を取得
+    const response = await axios.get(
+      `https://api.intra.42.fr/v2/campus/26/locations`,
+      {
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+        },
+        timeout: 15000
+      }
+    );
+    
+    // userがnullでない席から、ログイン名を抽出
+    const activeUsers = response.data
+      .filter(location => location.user !== null)
+      .map(location => location.user.login);
+    
+    // 重複を削除
+    const uniqueUsers = [...new Set(activeUsers)];
+    users.push(...uniqueUsers);
+    
+    cacheProgress.current = 1;
+    cacheProgress.message = '完了';
     console.log(`✅ 合計 ${users.length}人のアクティブユーザーを取得`);
   } catch (error) {
     console.error('ユーザー取得エラー:', error.message);

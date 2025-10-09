@@ -88,7 +88,8 @@
                 ✅ 通常課題: "finished"なら点数に関係なく表示 | 
                 🎓 EXAM課題: "finished"かつ100点以上の人のみ表示 | 
                 📝 任意の課題名も入力可能 | 
-                ⚡️ キャッシュは10分間有効、検索は数ミリ秒で完了
+                ⚡️ キャッシュは10分間有効、検索は数ミリ秒で完了 | 
+                🔄 キャッシュ更新中も検索可能
             </p>
         </footer>
     </div>
@@ -131,10 +132,15 @@
                 const progressDiv = document.getElementById('cacheProgressIndicator');
                 
                 if (data.isUpdating) {
-                    // キャッシュ作成中
+                    // キャッシュ作成中（古いキャッシュがあれば検索可能）
+                    const hasOldCache = data.userCount > 0;
+                    const searchableText = hasOldCache ? 
+                        '（現在のキャッシュで検索可能）' : 
+                        '（しばらくお待ちください）';
+                    
                     statusDiv.innerHTML = `
-                        🔄 キャッシュ作成中... 
-                        <span style="opacity: 0.8;">しばらくお待ちください</span>
+                        🔄 新しいキャッシュ作成中... 
+                        <span style="opacity: 0.8;">${searchableText}</span>
                     `;
                     statusDiv.style.display = 'block';
                     

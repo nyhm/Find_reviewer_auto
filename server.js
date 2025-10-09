@@ -158,7 +158,9 @@ async function updateCache() {
       }
       
       console.log(`\n📋 各ユーザーのプロジェクト情報を取得中...`);
-      const usersWithProjects = [];
+      
+      // 新しいキャッシュを一時変数に構築（古いキャッシュは保持）
+      const newCache = [];
       
       // フェーズをユーザー情報取得に切り替え
       cacheProgress.phase = 'users';
@@ -176,9 +178,9 @@ async function updateCache() {
         // ユーザーの詳細情報も取得
         const userDetails = await getUserDetails(token, login);
         
-        // 42Tokyoキャンパスの人のみをキャッシュに追加
+        // 42Tokyoキャンパスの人のみを新しいキャッシュに追加
         if (userDetails.campus_id === 26 || userDetails.location) {
-          usersWithProjects.push({
+          newCache.push({
             login: login,
             projects: projects,
             image: userDetails.image,
@@ -200,7 +202,8 @@ async function updateCache() {
       cacheProgress.total = 0;
       cacheProgress.message = '';
       
-      cachedUsersWithProjects = usersWithProjects;
+      // 新しいキャッシュが完成したら入れ替え（これで検索が途切れない）
+      cachedUsersWithProjects = newCache;
       cacheLastUpdated = new Date();
       console.log(`\n✅ キャッシュ更新完了 (${cachedUsersWithProjects.length}人)`);
       console.log(`⏰ 更新時刻: ${cacheLastUpdated.toLocaleString('ja-JP')}\n`);
@@ -330,6 +333,10 @@ app.get('/api/projects', async (req, res) => {
 // API: キャッシュ情報を取得
 app.get('/api/cache/status', (req, res) => {
   const totalProjects = cachedUsersWithProjects.reduce((sum, user) => sum + user.projects.length, 0);
+  const statusMessage = isCacheUpdating ? 
+    '新しいキャッシュ作成中（古いキャッシュで検索可能）' : 
+    null;
+  
   res.json({
     userCount: cachedUsersWithProjects.length,
     totalProjects: totalProjects,
@@ -337,7 +344,8 @@ app.get('/api/cache/status', (req, res) => {
     isValid: isCacheValid(),
     expiresIn: cacheLastUpdated ? CACHE_DURATION - (new Date() - cacheLastUpdated) : 0,
     isUpdating: isCacheUpdating,  // キャッシュ作成中かどうか
-    progress: isCacheUpdating ? cacheProgress : null  // 進捗情報
+    progress: isCacheUpdating ? cacheProgress : null,  // 進捗情報
+    statusMessage: statusMessage  // 状態メッセージ
   });
 });
 

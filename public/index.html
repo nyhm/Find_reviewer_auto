@@ -48,6 +48,15 @@
                 <p class="loading-note">※キャッシュから検索しています</p>
             </div>
 
+            <div id="cacheProgressIndicator" class="cache-progress" style="display: none;">
+                <h3>🔄 キャッシュ作成中</h3>
+                <div class="progress-bar">
+                    <div id="progressBarFill" class="progress-bar-fill"></div>
+                </div>
+                <p id="progressText">0 / 0</p>
+                <p id="progressMessage" class="progress-message"></p>
+            </div>
+
             <div id="results" class="results" style="display: none;">
                 <div class="results-header">
                     <h2 id="resultsTitle"></h2>
@@ -61,6 +70,14 @@
             </div>
 
             <div id="errorMessage" class="error" style="display: none;"></div>
+
+            <!-- ユーザー詳細モーダル -->
+            <div id="userModal" class="modal" style="display: none;">
+                <div class="modal-content">
+                    <span class="close">&times;</span>
+                    <div id="userModalBody"></div>
+                </div>
+            </div>
         </main>
 
         <footer>
@@ -70,7 +87,7 @@
             <p class="note">
                 ✅ statusが"finished"なら点数に関係なく表示 | 
                 📝 任意の課題名も入力可能 | 
-                ⚡️ 初回検索時にキャッシュを作成(3000人を調べるので時間がかかります)キャッシュがあると検索は数ミリ秒で完了
+                ⚡️ 初回検索時にキャッシュを作成(全員を調べるので時間がかかります)キャッシュがあると検索は数ミリ秒で完了
             </p>
         </footer>
     </div>
@@ -118,6 +135,9 @@
                         <span style="opacity: 0.8;">しばらくお待ちください</span>
                     `;
                     statusDiv.style.display = 'block';
+                    
+                    // 進捗表示を表示
+                    showCacheProgress(data.progress);
                 } else if (data.userCount > 0) {
                     // キャッシュ完成
                     const lastUpdated = new Date(data.lastUpdated);
@@ -233,12 +253,18 @@
                 data.reviewers.forEach(reviewer => {
                     const card = document.createElement('div');
                     card.className = 'reviewer-card';
+                    card.style.cursor = 'pointer';
+                    card.onclick = () => showUserModal(reviewer);
                     
                     const validated = reviewer.validated ? '✅' : '';
                     const statusBadge = '<span class="status-finished">完了</span>';
+                    const examBadge = reviewer.hasExam ? '<span class="exam-badge">EXAM✓</span>' : '<span class="no-exam-badge">EXAM未</span>';
                     
                     card.innerHTML = `
-                        <div class="reviewer-login">${reviewer.login}</div>
+                        <div class="reviewer-info">
+                            <div class="reviewer-login">${reviewer.login}</div>
+                            ${examBadge}
+                        </div>
                         <div class="reviewer-score">
                             ${statusBadge} ${validated} ${reviewer.finalMark}点
                         </div>
@@ -280,6 +306,71 @@
         function hideError() {
             document.getElementById('errorMessage').style.display = 'none';
         }
+
+        // キャッシュ作成進捗を表示
+        function showCacheProgress(progress) {
+            if (!progress) return;
+            
+            const progressDiv = document.getElementById('cacheProgressIndicator');
+            const progressBarFill = document.getElementById('progressBarFill');
+            const progressText = document.getElementById('progressText');
+            const progressMessage = document.getElementById('progressMessage');
+            
+            if (progress.total > 0) {
+                const percentage = (progress.current / progress.total) * 100;
+                progressBarFill.style.width = percentage + '%';
+                progressText.textContent = `${progress.current} / ${progress.total}`;
+                progressMessage.textContent = progress.message;
+                progressDiv.style.display = 'block';
+            } else {
+                progressDiv.style.display = 'none';
+            }
+        }
+
+        // ユーザー詳細モーダルを表示
+        function showUserModal(reviewer) {
+            const modal = document.getElementById('userModal');
+            const modalBody = document.getElementById('userModalBody');
+            
+            const examStatus = reviewer.hasExam ? 
+                '<span class="exam-badge">EXAM クリア済み ✓</span>' : 
+                '<span class="no-exam-badge">EXAM 未クリア</span>';
+            
+            const imageHtml = reviewer.image ? 
+                `<img src="${reviewer.image}" alt="${reviewer.login}" class="user-avatar">` : 
+                '<div class="user-avatar-placeholder">📷</div>';
+            
+            const locationHtml = reviewer.location ? 
+                `<p><strong>📍 Location:</strong> ${reviewer.location}</p>` : 
+                '<p><strong>📍 Location:</strong> オフライン</p>';
+            
+            modalBody.innerHTML = `
+                <div class="user-modal-header">
+                    ${imageHtml}
+                    <div>
+                        <h2>${reviewer.displayName || reviewer.login}</h2>
+                        <p class="user-login">@${reviewer.login}</p>
+                    </div>
+                </div>
+                <div class="user-modal-body">
+                    ${locationHtml}
+                    <p><strong>📊 スコア:</strong> ${reviewer.finalMark}点</p>
+                    <p><strong>✅ 検証:</strong> ${reviewer.validated ? 'はい' : 'いいえ'}</p>
+                    <p><strong>📝 ステータス:</strong> ${reviewer.status}</p>
+                    <div class="exam-status">${examStatus}</div>
+                </div>
+            `;
+            
+            modal.style.display = 'block';
+        }
+
+        // モーダルを閉じる
+        document.addEventListener('click', (e) => {
+            const modal = document.getElementById('userModal');
+            if (e.target === modal || e.target.className === 'close') {
+                modal.style.display = 'none';
+            }
+        });
 
         // イベントリスナー
         document.getElementById('searchBtn').addEventListener('click', searchReviewers);

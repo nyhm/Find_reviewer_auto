@@ -18,6 +18,7 @@ const CACHE_DURATION = 10 * 60 * 1000; //10分
 // キャッシュ作成中のロック機構
 let isCacheUpdating = false;
 let cacheUpdatePromise = null;
+let cacheProgress = { current: 0, total: 0, message: '' };
 
 // トークン取得関数（リトライロジック付き）
 async function getAccessToken(retryCount = 0) {
@@ -139,19 +140,34 @@ async function updateCache() {
       console.log(`\n📋 各ユーザーのプロジェクト情報を取得中...`);
       const usersWithProjects = [];
       
+      cacheProgress.total = activeUserLogins.length;
+      
       for (let i = 0; i < activeUserLogins.length; i++) {
         const login = activeUserLogins[i];
+        cacheProgress.current = i + 1;
+        cacheProgress.message = `${login}のプロジェクト情報を取得中...`;
         console.log(`  [${i + 1}/${activeUserLogins.length}] ${login}`);
         
         const projects = await getUserProjects(token, login);
+        
+        // ユーザーの詳細情報も取得
+        const userDetails = await getUserDetails(token, login);
+        
         usersWithProjects.push({
           login: login,
-          projects: projects
+          projects: projects,
+          image: userDetails.image,
+          location: userDetails.location,
+          displayName: userDetails.displayname || userDetails.usual_full_name || login
         });
         
         // レート制限対策（429エラー対策）
         await new Promise(resolve => setTimeout(resolve, 500));
       }
+      
+      cacheProgress.current = 0;
+      cacheProgress.total = 0;
+      cacheProgress.message = '';
       
       cachedUsersWithProjects = usersWithProjects;
       cacheLastUpdated = new Date();
@@ -199,6 +215,33 @@ async function getUserProjects(token, login) {
   } catch (error) {
     console.error(`${login}のプロジェクト取得エラー:`, error.message);
     return [];
+  }
+}
+
+// ユーザーの詳細情報を取得
+async function getUserDetails(token, login) {
+  try {
+    const response = await axios.get(
+      `https://api.intra.42.fr/v2/users/${login}`,
+      {
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+        },
+        timeout: 15000
+      }
+    );
+    return {
+      image: response.data.image?.versions?.medium || response.data.image?.link,
+      location: response.data.location,
+      displayname: response.data.displayname,
+      usual_full_name: response.data.usual_full_name,
+      pool_month: response.data.pool_month,
+      pool_year: response.data.pool_year
+    };
+  } catch (error) {
+    console.error(`${login}の詳細取得エラー:`, error.message);
+    return { image: null, location: null, displayname: login };
   }
 }
 
@@ -257,7 +300,32 @@ app.get('/api/cache/status', (req, res) => {
     lastUpdated: cacheLastUpdated,
     isValid: isCacheValid(),
     expiresIn: cacheLastUpdated ? CACHE_DURATION - (new Date() - cacheLastUpdated) : 0,
-    isUpdating: isCacheUpdating  // キャッシュ作成中かどうか
+    isUpdating: isCacheUpdating,  // キャッシュ作成中かどうか
+    progress: isCacheUpdating ? cacheProgress : null  // 進捗情報
+  });
+});
+
+// API: キャッシュ作成の進捗をSSEで配信
+app.get('/api/cache/progress', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  
+  const sendProgress = () => {
+    if (isCacheUpdating) {
+      res.write(`data: ${JSON.stringify(cacheProgress)}\n\n`);
+    } else {
+      res.write(`data: ${JSON.stringify({ current: 0, total: 0, message: 'completed' })}\n\n`);
+    }
+  };
+  
+  // 1秒ごとに進捗を送信
+  const interval = setInterval(sendProgress, 1000);
+  sendProgress(); // 初回送信
+  
+  req.on('close', () => {
+    clearInterval(interval);
+    res.end();
   });
 });
 
@@ -306,11 +374,25 @@ app.get('/api/reviewers/:projectName', async (req, res) => {
       );
       
       if (completedProject) {
+        // EXAMチェック：Exam Rank 02以上がfinishedかチェック
+        const hasExam = user.projects.some(
+          p => (p.project.name === 'Exam Rank 02' || 
+                p.project.name === 'Exam Rank 03' ||
+                p.project.name === 'Exam Rank 04' ||
+                p.project.name === 'Exam Rank 05' ||
+                p.project.name === 'Exam Rank 06') &&
+               p.status === 'finished'
+        );
+        
         reviewers.push({
           login: user.login,
           finalMark: completedProject.final_mark,
           validated: completedProject['validated?'],
-          status: completedProject.status
+          status: completedProject.status,
+          image: user.image,
+          location: user.location,
+          displayName: user.displayName,
+          hasExam: hasExam  // EXAMクリア済みフラグ
         });
         console.log(`  ✅ ${user.login} - ${completedProject.final_mark}点 (${completedProject.status})`);
       }

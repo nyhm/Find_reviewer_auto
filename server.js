@@ -15,6 +15,10 @@ let cachedUsersWithProjects = []; // { login: string, projects: array }
 let cacheLastUpdated = null;
 const CACHE_DURATION = 10 * 60 * 1000; //10分
 
+// キャッシュ作成中のロック機構
+let isCacheUpdating = false;
+let cacheUpdatePromise = null;
+
 // トークン取得関数（リトライロジック付き）
 async function getAccessToken(retryCount = 0) {
   try {
@@ -110,45 +114,63 @@ async function getActiveUsers(token) {
 }
 
 // キャッシュを更新（ユーザーとプロジェクト情報を含む）
+// ロック機構付き：同時に1つのキャッシュ作成のみ実行
 async function updateCache() {
-  try {
-    console.log('\n🔄 キャッシュを更新中...');
-    const token = await getAccessToken();
-    const activeUserLogins = await getActiveUsers(token);
-    
-    if (activeUserLogins.length === 0) {
-      console.warn('⚠️  アクティブユーザーが0人です');
-      return false;
-    }
-    
-    console.log(`\n📋 各ユーザーのプロジェクト情報を取得中...`);
-    const usersWithProjects = [];
-    
-    for (let i = 0; i < activeUserLogins.length; i++) {
-      const login = activeUserLogins[i];
-      console.log(`  [${i + 1}/${activeUserLogins.length}] ${login}`);
-      
-      const projects = await getUserProjects(token, login);
-      usersWithProjects.push({
-        login: login,
-        projects: projects
-      });
-      
-      // レート制限対策（429エラー対策）
-      await new Promise(resolve => setTimeout(resolve, 500));
-    }
-    
-    cachedUsersWithProjects = usersWithProjects;
-    cacheLastUpdated = new Date();
-    console.log(`\n✅ キャッシュ更新完了 (${cachedUsersWithProjects.length}人)`);
-    console.log(`⏰ 更新時刻: ${cacheLastUpdated.toLocaleString('ja-JP')}\n`);
-    return true;
-  } catch (error) {
-    console.error('❌ キャッシュ更新エラー:', error.message);
-    console.error('💡 アプリは起動していますが、キャッシュは作成されていません');
-    console.error('💡 手動で「🔄 更新」ボタンをクリックしてみてください\n');
-    return false;
+  // 既にキャッシュ作成中の場合は、そのPromiseを返す（待機）
+  if (isCacheUpdating && cacheUpdatePromise) {
+    console.log('⏳ キャッシュ作成中です。完了を待っています...');
+    return cacheUpdatePromise;
   }
+  
+  // キャッシュ作成開始
+  isCacheUpdating = true;
+  
+  cacheUpdatePromise = (async () => {
+    try {
+      console.log('\n🔄 キャッシュを更新中...');
+      const token = await getAccessToken();
+      const activeUserLogins = await getActiveUsers(token);
+      
+      if (activeUserLogins.length === 0) {
+        console.warn('⚠️  アクティブユーザーが0人です');
+        return false;
+      }
+      
+      console.log(`\n📋 各ユーザーのプロジェクト情報を取得中...`);
+      const usersWithProjects = [];
+      
+      for (let i = 0; i < activeUserLogins.length; i++) {
+        const login = activeUserLogins[i];
+        console.log(`  [${i + 1}/${activeUserLogins.length}] ${login}`);
+        
+        const projects = await getUserProjects(token, login);
+        usersWithProjects.push({
+          login: login,
+          projects: projects
+        });
+        
+        // レート制限対策（429エラー対策）
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      
+      cachedUsersWithProjects = usersWithProjects;
+      cacheLastUpdated = new Date();
+      console.log(`\n✅ キャッシュ更新完了 (${cachedUsersWithProjects.length}人)`);
+      console.log(`⏰ 更新時刻: ${cacheLastUpdated.toLocaleString('ja-JP')}\n`);
+      return true;
+    } catch (error) {
+      console.error('❌ キャッシュ更新エラー:', error.message);
+      console.error('💡 アプリは起動していますが、キャッシュは作成されていません');
+      console.error('💡 手動で「🔄 更新」ボタンをクリックしてみてください\n');
+      return false;
+    } finally {
+      // ロックを解放
+      isCacheUpdating = false;
+      cacheUpdatePromise = null;
+    }
+  })();
+  
+  return cacheUpdatePromise;
 }
 
 // キャッシュが有効かチェック
@@ -234,7 +256,8 @@ app.get('/api/cache/status', (req, res) => {
     totalProjects: totalProjects,
     lastUpdated: cacheLastUpdated,
     isValid: isCacheValid(),
-    expiresIn: cacheLastUpdated ? CACHE_DURATION - (new Date() - cacheLastUpdated) : 0
+    expiresIn: cacheLastUpdated ? CACHE_DURATION - (new Date() - cacheLastUpdated) : 0,
+    isUpdating: isCacheUpdating  // キャッシュ作成中かどうか
   });
 });
 

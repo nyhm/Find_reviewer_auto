@@ -110,13 +110,29 @@
                 const data = await response.json();
                 
                 const statusDiv = document.getElementById('cacheStatus');
-                if (data.userCount > 0) {
+                
+                if (data.isUpdating) {
+                    // キャッシュ作成中
+                    statusDiv.innerHTML = `
+                        🔄 キャッシュ作成中... 
+                        <span style="opacity: 0.8;">しばらくお待ちください</span>
+                    `;
+                    statusDiv.style.display = 'block';
+                } else if (data.userCount > 0) {
+                    // キャッシュ完成
                     const lastUpdated = new Date(data.lastUpdated);
                     const timeStr = lastUpdated.toLocaleTimeString('ja-JP');
                     statusDiv.innerHTML = `
                         📊 キャッシュ: <strong>${data.userCount}人</strong> 
                         (${data.totalProjects}プロジェクト)
                         | 更新: ${timeStr}
+                    `;
+                    statusDiv.style.display = 'block';
+                } else {
+                    // キャッシュなし
+                    statusDiv.innerHTML = `
+                        ⚠️ キャッシュ未作成 
+                        <span style="opacity: 0.8;">検索または更新ボタンをクリックしてください</span>
                     `;
                     statusDiv.style.display = 'block';
                 }

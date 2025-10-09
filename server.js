@@ -107,13 +107,20 @@ async function getActiveUsers(token) {
       
       if (response.data.length === 0) break;
       
-      // location !== null の人を抽出
+      // location !== null かつ 42Tokyo所属の人を抽出
       const activeUsers = response.data
-        .filter(user => user.location !== null)
+        .filter(user => {
+          // locationがnullでないこと
+          if (!user.location) return false;
+          
+          // 42Tokyo (campus_id: 26) に所属していること
+          const has42Tokyo = user.campus_users?.some(cu => cu.campus_id === 26);
+          return has42Tokyo;
+        })
         .map(user => user.login);
       
       users.push(...activeUsers);
-      console.log(`   ページ ${page}: ${activeUsers.length}人 (location有り)`);
+      console.log(`   ページ ${page}: ${activeUsers.length}人 (42Tokyo・校舎内)`);
       
       // レート制限対策
       await new Promise(resolve => setTimeout(resolve, 500));

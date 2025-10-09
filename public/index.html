@@ -85,8 +85,8 @@
                 現在校舎にログイン中の学生から、選択した課題が<strong>一度でも終わっている人（finished）</strong>を表示します
             </p>
             <p class="note">
-                ✅ 課題が"finished"なら点数に関係なく表示 | 
-                🎓 EXAM判定: Exam Rank 02以上が100点以上でクリア済み | 
+                ✅ 通常課題: "finished"なら点数に関係なく表示 | 
+                🎓 EXAM課題: "finished"かつ100点以上の人のみ表示 | 
                 📝 任意の課題名も入力可能 | 
                 ⚡️ キャッシュは10分間有効、検索は数ミリ秒で完了
             </p>
@@ -272,19 +272,13 @@
                     
                     const validated = reviewer.validated ? '✅' : '';
                     const statusBadge = '<span class="status-finished">完了</span>';
-                    const examBadge = reviewer.hasExam ? 
-                        '<span class="exam-badge">EXAM✓</span>' : 
-                        '<span class="no-exam-badge">EXAM未</span>';
                     const locationBadge = reviewer.location ? 
                         `<span class="location-badge">📍 ${reviewer.location}</span>` : '';
                     
                     card.innerHTML = `
                         <div class="reviewer-info">
                             <div class="reviewer-login">${reviewer.login}</div>
-                            <div class="badges">
-                                ${examBadge}
-                                ${locationBadge}
-                            </div>
+                            ${locationBadge}
                         </div>
                         <div class="reviewer-score">
                             ${statusBadge} ${validated} ${reviewer.finalMark}点
@@ -372,10 +366,6 @@
             const modal = document.getElementById('userModal');
             const modalBody = document.getElementById('userModalBody');
             
-            const examStatus = reviewer.hasExam ? 
-                '<span class="exam-badge">EXAM クリア済み ✓</span>' : 
-                '<span class="no-exam-badge">EXAM 未クリア</span>';
-            
             const imageHtml = reviewer.image ? 
                 `<img src="${reviewer.image}" alt="${reviewer.login}" class="user-avatar">` : 
                 '<div class="user-avatar-placeholder">📷</div>';
@@ -397,7 +387,6 @@
                     <p><strong>📊 スコア:</strong> ${reviewer.finalMark}点</p>
                     <p><strong>✅ 検証:</strong> ${reviewer.validated ? 'はい' : 'いいえ'}</p>
                     <p><strong>📝 ステータス:</strong> ${reviewer.status}</p>
-                    <div class="exam-status">${examStatus}</div>
                 </div>
             `;
             

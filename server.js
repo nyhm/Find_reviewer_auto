@@ -402,34 +402,33 @@ app.get('/api/reviewers/:projectName', async (req, res) => {
     const startTime = Date.now();
     const reviewers = [];
     
+    // 検索対象の課題がEXAMかどうかを判定
+    const isExamProject = projectName === 'Exam Rank 02' || 
+                         projectName === 'Exam Rank 03' ||
+                         projectName === 'Exam Rank 04' ||
+                         projectName === 'Exam Rank 05' ||
+                         projectName === 'Exam Rank 06';
+    
     // キャッシュから直接検索（APIリクエスト不要！）
     for (const user of cachedUsersWithProjects) {
-      const completedProject = user.projects.find(
-        p => p.project.name === projectName && 
-             p.status === "finished"
-      );
+      let completedProject;
+      
+      if (isExamProject) {
+        // EXAMの場合：finishedかつ100点以上
+        completedProject = user.projects.find(
+          p => p.project.name === projectName && 
+               p.status === "finished" &&
+               p.final_mark >= 100
+        );
+      } else {
+        // 通常の課題：finishedのみ（点数関係なし）
+        completedProject = user.projects.find(
+          p => p.project.name === projectName && 
+               p.status === "finished"
+        );
+      }
       
       if (completedProject) {
-        // EXAMチェック：Exam Rank 02以上がfinishedかつ100点以上かチェック
-        const hasExam = user.projects.some(
-          p => {
-            const isExam = p.project.name === 'Exam Rank 02' || 
-                          p.project.name === 'Exam Rank 03' ||
-                          p.project.name === 'Exam Rank 04' ||
-                          p.project.name === 'Exam Rank 05' ||
-                          p.project.name === 'Exam Rank 06';
-            const isFinished = p.status === 'finished';
-            const hasPassingScore = p.final_mark >= 100;
-            
-            // デバッグログ
-            if (isExam && isFinished) {
-              console.log(`  EXAM判定 ${user.login}: ${p.project.name} = ${p.final_mark}点 (${hasPassingScore ? 'クリア' : '不合格'})`);
-            }
-            
-            return isExam && isFinished && hasPassingScore;
-          }
-        );
-        
         reviewers.push({
           login: user.login,
           finalMark: completedProject.final_mark,
@@ -437,8 +436,7 @@ app.get('/api/reviewers/:projectName', async (req, res) => {
           status: completedProject.status,
           image: user.image,
           location: user.location,
-          displayName: user.displayName,
-          hasExam: hasExam  // EXAMクリア済みフラグ
+          displayName: user.displayName
         });
         console.log(`  ✅ ${user.login} - ${completedProject.final_mark}点 (${completedProject.status})`);
       }

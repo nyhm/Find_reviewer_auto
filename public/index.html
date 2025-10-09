@@ -128,6 +128,7 @@
                 const data = await response.json();
                 
                 const statusDiv = document.getElementById('cacheStatus');
+                const progressDiv = document.getElementById('cacheProgressIndicator');
                 
                 if (data.isUpdating) {
                     // キャッシュ作成中
@@ -139,25 +140,32 @@
                     
                     // 進捗表示を表示
                     showCacheProgress(data.progress);
-                } else if (data.userCount > 0) {
-                    // キャッシュ完成
-                    const lastUpdated = new Date(data.lastUpdated);
-                    const timeStr = lastUpdated.toLocaleTimeString('ja-JP');
-                    const expiresInMin = Math.floor(data.expiresIn / 60000);
-                    const expiresText = expiresInMin > 0 ? `あと${expiresInMin}分有効` : '期限切れ';
-                    statusDiv.innerHTML = `
-                        📊 キャッシュ: <strong>${data.userCount}人</strong> 
-                        (${data.totalProjects}プロジェクト)
-                        | 更新: ${timeStr} | ${expiresText}
-                    `;
-                    statusDiv.style.display = 'block';
                 } else {
-                    // キャッシュなし
-                    statusDiv.innerHTML = `
-                        ⚠️ キャッシュ未作成 
-                        <span style="opacity: 0.8;">検索または更新ボタンをクリックしてください</span>
-                    `;
-                    statusDiv.style.display = 'block';
+                    // キャッシュ作成完了 - 進捗表示を非表示
+                    if (progressDiv) {
+                        progressDiv.style.display = 'none';
+                    }
+                    
+                    if (data.userCount > 0) {
+                        // キャッシュ完成
+                        const lastUpdated = new Date(data.lastUpdated);
+                        const timeStr = lastUpdated.toLocaleTimeString('ja-JP');
+                        const expiresInMin = Math.floor(data.expiresIn / 60000);
+                        const expiresText = expiresInMin > 0 ? `あと${expiresInMin}分有効` : '期限切れ';
+                        statusDiv.innerHTML = `
+                            📊 キャッシュ: <strong>${data.userCount}人</strong> 
+                            (${data.totalProjects}プロジェクト)
+                            | 更新: ${timeStr} | ${expiresText}
+                        `;
+                        statusDiv.style.display = 'block';
+                    } else {
+                        // キャッシュなし
+                        statusDiv.innerHTML = `
+                            ⚠️ キャッシュ未作成 
+                            <span style="opacity: 0.8;">検索または更新ボタンをクリックしてください</span>
+                        `;
+                        statusDiv.style.display = 'block';
+                    }
                 }
             } catch (error) {
                 console.error('キャッシュ状態の取得に失敗:', error);
@@ -177,8 +185,9 @@
                 const data = await response.json();
                 
                 if (response.ok) {
-                    await updateCacheStatus();
-                    showError('✅ キャッシュを更新しました（' + data.userCount + '人、' + data.totalProjects + 'プロジェクト）');
+                    // 更新開始後、リアルタイム監視を再開
+                    startCacheMonitoring();
+                    showError('✅ キャッシュ更新を開始しました！進捗を確認できます。');
                     setTimeout(() => hideError(), 3000);
                 } else {
                     showError('キャッシュの更新に失敗しました');
@@ -209,6 +218,8 @@
             hideError();
             hideResults();
             showLoading();
+            
+            console.log('検索開始:', projectName);
             document.getElementById('searchBtn').disabled = true;
 
             try {
@@ -294,11 +305,15 @@
 
         // ローディング表示
         function showLoading() {
-            document.getElementById('loadingIndicator').style.display = 'block';
+            const loadingDiv = document.getElementById('loadingIndicator');
+            loadingDiv.style.display = 'flex';
+            console.log('ローディング表示');
         }
 
         function hideLoading() {
-            document.getElementById('loadingIndicator').style.display = 'none';
+            const loadingDiv = document.getElementById('loadingIndicator');
+            loadingDiv.style.display = 'none';
+            console.log('ローディング非表示');
         }
 
         // 結果非表示
@@ -425,12 +440,46 @@
             }
         });
 
+        // キャッシュ更新監視用のインターバルID
+        let cacheUpdateInterval = null;
+
+        // キャッシュ状態の監視を開始
+        function startCacheMonitoring() {
+            // 既存のインターバルをクリア
+            if (cacheUpdateInterval) {
+                clearInterval(cacheUpdateInterval);
+            }
+            
+            // キャッシュ作成中は1秒ごと、それ以外は10秒ごとに更新
+            const checkInterval = async () => {
+                const response = await fetch('/api/cache/status');
+                const data = await response.json();
+                
+                if (data.isUpdating) {
+                    // キャッシュ作成中は1秒ごとに更新
+                    if (!cacheUpdateInterval || cacheUpdateInterval._interval !== 1000) {
+                        if (cacheUpdateInterval) clearInterval(cacheUpdateInterval);
+                        cacheUpdateInterval = setInterval(updateCacheStatus, 1000);
+                        cacheUpdateInterval._interval = 1000;
+                    }
+                } else {
+                    // 通常時は10秒ごとに更新
+                    if (!cacheUpdateInterval || cacheUpdateInterval._interval !== 10000) {
+                        if (cacheUpdateInterval) clearInterval(cacheUpdateInterval);
+                        cacheUpdateInterval = setInterval(updateCacheStatus, 10000);
+                        cacheUpdateInterval._interval = 10000;
+                    }
+                }
+                
+                await updateCacheStatus();
+            };
+            
+            checkInterval();
+        }
+
         // 初期化
         loadProjects();
-        updateCacheStatus();
-        
-        // 定期的にキャッシュ状態を更新（30秒ごと）
-        setInterval(updateCacheStatus, 30000);
+        startCacheMonitoring();
     </script>
 </body>
 </html>

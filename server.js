@@ -116,6 +116,11 @@ async function updateCache() {
     const token = await getAccessToken();
     const activeUserLogins = await getActiveUsers(token);
     
+    if (activeUserLogins.length === 0) {
+      console.warn('⚠️  アクティブユーザーが0人です');
+      return false;
+    }
+    
     console.log(`\n📋 各ユーザーのプロジェクト情報を取得中...`);
     const usersWithProjects = [];
     
@@ -140,6 +145,8 @@ async function updateCache() {
     return true;
   } catch (error) {
     console.error('❌ キャッシュ更新エラー:', error.message);
+    console.error('💡 アプリは起動していますが、キャッシュは作成されていません');
+    console.error('💡 手動で「🔄 更新」ボタンをクリックしてみてください\n');
     return false;
   }
 }
@@ -304,10 +311,15 @@ app.listen(PORT, async () => {
   console.log(`\n🚀 サーバーが起動しました: http://localhost:${PORT}`);
   console.log(`📍 42Tokyo レビュワー検索システム\n`);
   
-  // 初回キャッシュ作成
-  await updateCache();
+  // 初回キャッシュ作成（失敗してもサーバーは起動）
+  const success = await updateCache();
   
-  // 定期的にキャッシュを更新（10分ごと）
+  if (!success) {
+    console.log('⚠️  キャッシュ作成に失敗しましたが、サーバーは起動しています');
+    console.log('💡 ブラウザから手動更新を試すか、Railway.appへの移行を検討してください\n');
+  }
+  
+  // 定期的にキャッシュを更新（5分ごと）
   setInterval(async () => {
     console.log('\n⏰ 定期キャッシュ更新...');
     await updateCache();

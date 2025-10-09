@@ -86,46 +86,33 @@ async function getActiveUsers(token) {
     
     // 進捗表示の初期化
     cacheProgress.phase = 'pages';
-    cacheProgress.total = 30;
+    cacheProgress.total = 1;
     cacheProgress.current = 0;
+    cacheProgress.message = '42Tokyo校舎の席情報を取得中...';
     
-    // 30ページから location !== null の人を取得
-    for (let page = 1; page <= 30; page++) {
-      cacheProgress.current = page;
-      cacheProgress.message = `ページ ${page} を取得中...`;
-      
-      const response = await axios.get(
-        `https://api.intra.42.fr/v2/campus/26/users?page=${page}&per_page=100`,
-        {
-          headers: { 
-            'Authorization': `Bearer ${token}`,
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
-          },
-          timeout: 15000
-        }
-      );
-      
-      if (response.data.length === 0) break;
-      
-      // location !== null かつ 42Tokyo所属の人を抽出
-      const activeUsers = response.data
-        .filter(user => {
-          // locationがnullでないこと
-          if (!user.location) return false;
-          
-          // 42Tokyo (campus_id: 26) に所属していること
-          const has42Tokyo = user.campus_users?.some(cu => cu.campus_id === 26);
-          return has42Tokyo;
-        })
-        .map(user => user.login);
-      
-      users.push(...activeUsers);
-      console.log(`   ページ ${page}: ${activeUsers.length}人 (42Tokyo・校舎内)`);
-      
-      // レート制限対策
-      await new Promise(resolve => setTimeout(resolve, 500));
-    }
-    console.log(`✅ 合計 ${users.length}人のアクティブユーザーを取得`);
+    // locationsエンドポイントから現在校舎にいる人を取得（これが最も正確）
+    const response = await axios.get(
+      `https://api.intra.42.fr/v2/campus/26/locations`,
+      {
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+        },
+        timeout: 15000
+      }
+    );
+    
+    // userがnullでない席から、ログイン名を抽出
+    const activeLogins = response.data
+      .filter(location => location.user !== null)
+      .map(location => location.user.login);
+    
+    // 重複を削除
+    const uniqueUsers = [...new Set(activeLogins)];
+    users.push(...uniqueUsers);
+    
+    cacheProgress.current = 1;
+    console.log(`✅ 合計 ${users.length}人のアクティブユーザーを取得（42Tokyo校舎）`);
   } catch (error) {
     console.error('ユーザー取得エラー:', error.message);
   }

@@ -13,7 +13,7 @@ app.use(express.json());
 // キャッシュ用変数
 let cachedUsersWithProjects = []; // { login: string, projects: array }
 let cacheLastUpdated = null;
-const CACHE_DURATION = 5 * 60 * 1000; //5分
+const CACHE_DURATION = 10 * 60 * 1000; //10分
 
 // トークン取得関数（リトライロジック付き）
 async function getAccessToken(retryCount = 0) {
@@ -78,7 +78,7 @@ async function getActiveUsers(token) {
   try {
     console.log('📡 校舎内のユーザー情報を取得中...');
     // 最初の数ページのみ取得（処理時間短縮のため）
-    for (let page = 1; page <= 10; page++) {
+    for (let page = 1; page <= 100; page++) {
       const response = await axios.get(
         `https://api.intra.42.fr/v2/campus/26/users?page=${page}&per_page=100`,
         {
@@ -99,8 +99,8 @@ async function getActiveUsers(token) {
       users.push(...activeUsers);
       console.log(`   ページ ${page}: ${activeUsers.length}人`);
       
-      // レート制限対策
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // レート制限対策（429エラー対策）
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
     console.log(`✅ 合計 ${users.length}人のアクティブユーザーを取得`);
   } catch (error) {
@@ -134,8 +134,8 @@ async function updateCache() {
         projects: projects
       });
       
-      // レート制限対策
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // レート制限対策（429エラー対策）
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
     
     cachedUsersWithProjects = usersWithProjects;
@@ -185,11 +185,18 @@ app.get('/api/projects', async (req, res) => {
   try {
     // 42Tokyoでよく使われる課題リスト
     const commonProjects = [
-      'Libft',
+      'Exam Rank 02',
+      'Exam Rank 03',
+      'Exam Rank 04',
+      'Exam Rank 05',
+      'Exam Rank 06',
       'get_next_line',
       'ft_printf',
       'Born2beroot',
       'so_long',
+      'FdF',
+      'fract-ol',
+      'ft_minitalk',
       'push_swap',
       'pipex',
       'minishell',
@@ -206,11 +213,11 @@ app.get('/api/projects', async (req, res) => {
       'CPP Module 09',
       'NetPractice',
       'cub3d',
+      'Inception',
       'miniRT',
-      'ft_containers',
+      'ft_irc',
       'webserv',
-      'ft_transcendence',
-      'Inception'
+      'ft_transcendence'
     ];
     
     res.json({ projects: commonProjects });

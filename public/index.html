@@ -23,6 +23,16 @@
                     </select>
                 </div>
                 
+                <div class="input-group">
+                    <label for="projectInput">または課題名を入力:</label>
+                    <input 
+                        type="text" 
+                        id="projectInput" 
+                        placeholder="例: ft_irc"
+                        title="プルダウンにない課題も検索可能"
+                    >
+                </div>
+                
                 <button id="searchBtn" disabled>
                     🔍 検索
                 </button>
@@ -58,7 +68,9 @@
                 現在校舎にログイン中の学生から、選択した課題が<strong>一度でも終わっている人（finished）</strong>を表示します
             </p>
             <p class="note">
-                ✅ statusが"finished"なら点数に関係なく表示 | ⚡️ 検索は数ミリ秒で完了
+                ✅ statusが"finished"なら点数に関係なく表示 | 
+                📝 任意の課題名も入力可能 | 
+                ⚡️ 検索は数ミリ秒で完了
             </p>
         </footer>
     </div>
@@ -143,10 +155,14 @@
 
         // レビュワーを検索
         async function searchReviewers() {
-            const projectName = document.getElementById('projectSelect').value;
+            const selectValue = document.getElementById('projectSelect').value;
+            const inputValue = document.getElementById('projectInput').value.trim();
+            
+            // 入力フィールド優先、なければプルダウン
+            const projectName = inputValue || selectValue;
             
             if (!projectName) {
-                showError('課題を選択してください');
+                showError('課題を選択または入力してください');
                 return;
             }
 
@@ -253,7 +269,25 @@
         document.getElementById('searchBtn').addEventListener('click', searchReviewers);
         document.getElementById('refreshCacheBtn').addEventListener('click', refreshCache);
         
+        document.getElementById('projectSelect').addEventListener('change', () => {
+            // プルダウンを選択したら入力フィールドをクリア
+            document.getElementById('projectInput').value = '';
+        });
+        
+        document.getElementById('projectInput').addEventListener('input', () => {
+            // 入力フィールドに入力したらプルダウンをリセット
+            if (document.getElementById('projectInput').value) {
+                document.getElementById('projectSelect').value = '';
+            }
+        });
+        
         document.getElementById('projectSelect').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                searchReviewers();
+            }
+        });
+        
+        document.getElementById('projectInput').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 searchReviewers();
             }

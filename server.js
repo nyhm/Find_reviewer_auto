@@ -84,38 +84,12 @@ async function getActiveUsers(token) {
   try {
     console.log('📡 校舎内のユーザー情報を取得中...');
     
-    // Step 1: locationsエンドポイントから現在校舎にいる人を取得
-    console.log('📍 現在の席情報を取得中...');
-    const locationsResponse = await axios.get(
-      `https://api.intra.42.fr/v2/campus/26/locations`,
-      {
-        headers: { 
-          'Authorization': `Bearer ${token}`,
-          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
-        },
-        timeout: 15000
-      }
-    );
-    
-    // 現在校舎にいる人のログイン名セット
-    const activeLoginsInCampus = new Set(
-      locationsResponse.data
-        .filter(location => location.user !== null)
-        .map(location => location.user.login)
-    );
-    
-    console.log(`✅ ${activeLoginsInCampus.size}人が現在校舎にログイン中`);
-    
-    // Step 2: 30ページを検索して、42Tokyoに所属している人を探す
-    console.log('📄 30ページからユーザー情報を取得中...');
-    
     // 進捗表示の初期化
     cacheProgress.phase = 'pages';
     cacheProgress.total = 30;
     cacheProgress.current = 0;
     
-    const userSet = new Set();
-    
+    // 30ページから location !== null の人を取得
     for (let page = 1; page <= 30; page++) {
       cacheProgress.current = page;
       cacheProgress.message = `ページ ${page} を取得中...`;
@@ -133,21 +107,18 @@ async function getActiveUsers(token) {
       
       if (response.data.length === 0) break;
       
-      // activeLoginsInCampusに含まれる（= 校舎にいる）人を抽出
-      const pageActiveUsers = response.data
-        .filter(user => activeLoginsInCampus.has(user.login))
+      // location !== null の人を抽出
+      const activeUsers = response.data
+        .filter(user => user.location !== null)
         .map(user => user.login);
       
-      pageActiveUsers.forEach(login => userSet.add(login));
-      
-      console.log(`   ページ ${page}: ${pageActiveUsers.length}人が校舎内`);
+      users.push(...activeUsers);
+      console.log(`   ページ ${page}: ${activeUsers.length}人 (location有り)`);
       
       // レート制限対策
       await new Promise(resolve => setTimeout(resolve, 500));
     }
-    
-    users.push(...Array.from(userSet));
-    console.log(`✅ 合計 ${users.length}人のアクティブユーザーを取得（42Tokyo校舎内）`);
+    console.log(`✅ 合計 ${users.length}人のアクティブユーザーを取得`);
   } catch (error) {
     console.error('ユーザー取得エラー:', error.message);
   }

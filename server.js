@@ -86,11 +86,11 @@ async function getActiveUsers(token) {
     
     // 進捗表示の初期化
     cacheProgress.phase = 'pages';
-    cacheProgress.total = 30; // 予想される最大ページ数
+    cacheProgress.total = 1;
     cacheProgress.current = 0;
+    cacheProgress.message = '席情報を取得中...';
     
-    // まず現在校舎にいる人のログイン名リストを取得
-    console.log('📍 現在の席情報を取得中...');
+    // locationsエンドポイントから現在校舎にいる人のログイン名を取得
     const locationsResponse = await axios.get(
       `https://api.intra.42.fr/v2/campus/26/locations`,
       {
@@ -102,45 +102,16 @@ async function getActiveUsers(token) {
       }
     );
     
-    // 現在校舎にいる人のログイン名セット
-    const activeLogins = new Set(
-      locationsResponse.data
-        .filter(location => location.user !== null)
-        .map(location => location.user.login)
-    );
+    // userがnullでない席から、ログイン名を抽出
+    const activeLogins = locationsResponse.data
+      .filter(location => location.user !== null)
+      .map(location => location.user.login);
     
-    console.log(`✅ ${activeLogins.size}人が現在校舎にいます`);
+    // 重複を削除
+    const uniqueUsers = [...new Set(activeLogins)];
+    users.push(...uniqueUsers);
     
-    // 30ページからユーザーを取得して、校舎にいる人だけを抽出
-    console.log('📄 ユーザー情報をページから取得中...');
-    for (let page = 1; page <= 30; page++) {
-      cacheProgress.current = page;
-      cacheProgress.message = `ページ ${page} を取得中...`;
-      
-      const response = await axios.get(
-        `https://api.intra.42.fr/v2/campus/26/users?page=${page}&per_page=100`,
-        {
-          headers: { 
-            'Authorization': `Bearer ${token}`,
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
-          },
-          timeout: 15000
-        }
-      );
-      
-      if (response.data.length === 0) break;
-      
-      // activeLoginsに含まれるユーザーのみを抽出
-      const pageActiveUsers = response.data
-        .filter(user => activeLogins.has(user.login))
-        .map(user => user.login);
-      
-      users.push(...pageActiveUsers);
-      console.log(`   ページ ${page}: ${pageActiveUsers.length}/${response.data.length}人 (校舎内)`);
-      
-      // レート制限対策
-      await new Promise(resolve => setTimeout(resolve, 500));
-    }
+    cacheProgress.current = 1;
     console.log(`✅ 合計 ${users.length}人のアクティブユーザーを取得`);
   } catch (error) {
     console.error('ユーザー取得エラー:', error.message);

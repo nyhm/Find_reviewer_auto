@@ -13,6 +13,7 @@ app.use(express.json());
 // キャッシュ用変数
 let cachedUsersWithProjects = []; // { login: string, projects: array }
 let cacheLastUpdated = null;
+let cacheCreated = false; // キャッシュが一度でも作成されたかどうか
 const CACHE_DURATION = 10 * 60 * 1000; //10分
 
 // キャッシュ作成中のロック機構
@@ -147,9 +148,15 @@ async function updateCache() {
       const token = await getAccessToken();
       const activeUserLogins = await getActiveUsers(token);
       
+      // 0人でもキャッシュ作成は継続（空のキャッシュとして保存）
       if (activeUserLogins.length === 0) {
-        console.warn('⚠️  アクティブユーザーが0人です');
-        return false;
+        console.warn('⚠️  現在アクティブユーザーが0人です');
+        cachedUsersWithProjects = [];
+        cacheLastUpdated = new Date();
+        cacheCreated = true;
+        console.log(`\n✅ キャッシュ更新完了 (0人)`);
+        console.log(`⏰ 更新時刻: ${cacheLastUpdated.toLocaleString('ja-JP')}\n`);
+        return true; // 成功として返す
       }
       
       console.log(`\n📋 各ユーザーのプロジェクト情報を取得中...`);
@@ -198,13 +205,19 @@ async function updateCache() {
       // 新しいキャッシュが完成したら入れ替え（これで検索が途切れない）
       cachedUsersWithProjects = newCache;
       cacheLastUpdated = new Date();
+      cacheCreated = true; // キャッシュ作成完了フラグ
       console.log(`\n✅ キャッシュ更新完了 (${cachedUsersWithProjects.length}人)`);
       console.log(`⏰ 更新時刻: ${cacheLastUpdated.toLocaleString('ja-JP')}\n`);
       return true;
     } catch (error) {
       console.error('❌ キャッシュ更新エラー:', error.message);
-      console.error('💡 アプリは起動していますが、キャッシュは作成されていません');
-      console.error('💡 手動で「🔄 更新」ボタンをクリックしてみてください\n');
+      
+      // エラーでも、一度キャッシュを作成したことがあれば継続
+      if (!cacheCreated) {
+        console.error('💡 初回キャッシュ作成に失敗しました');
+        console.error('💡 手動で「🔄 更新」ボタンをクリックしてみてください\n');
+      }
+      
       return false;
     } finally {
       // ロックを解放
@@ -354,7 +367,8 @@ app.get('/api/cache/status', (req, res) => {
     expiresIn: cacheLastUpdated ? CACHE_DURATION - (new Date() - cacheLastUpdated) : 0,
     isUpdating: isCacheUpdating,  // キャッシュ作成中かどうか
     progress: isCacheUpdating ? cacheProgress : null,  // 進捗情報
-    statusMessage: statusMessage  // 状態メッセージ
+    statusMessage: statusMessage,  // 状態メッセージ
+    cacheCreated: cacheCreated  // キャッシュが一度でも作成されたか
   });
 });
 
@@ -488,9 +502,11 @@ app.listen(PORT, HOST, async () => {
   // 初回キャッシュ作成（失敗してもサーバーは起動）
   const success = await updateCache();
   
-  if (!success) {
-    console.log('⚠️  キャッシュ作成に失敗しましたが、サーバーは起動しています');
-    console.log('💡 ブラウザから手動更新を試すか、Railway.appへの移行を検討してください\n');
+  if (!success && !cacheCreated) {
+    console.log('⚠️  初回キャッシュ作成に失敗しましたが、サーバーは起動しています');
+    console.log('💡 ブラウザから手動更新を試してください\n');
+  } else if (cachedUsersWithProjects.length === 0 && cacheCreated) {
+    console.log('ℹ️  現在アクティブなユーザーが0人です（キャッシュは正常に作成されました）\n');
   }
   
   // 定期的にキャッシュを更新（5分ごと）

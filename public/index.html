@@ -152,23 +152,32 @@
                         progressDiv.style.display = 'none';
                     }
                     
-                    if (data.userCount > 0) {
-                        // キャッシュ完成
+                    if (data.cacheCreated) {
+                        // キャッシュ作成済み
                         const lastUpdated = new Date(data.lastUpdated);
                         const timeStr = lastUpdated.toLocaleTimeString('ja-JP');
                         const expiresInMin = Math.floor(data.expiresIn / 60000);
                         const expiresText = expiresInMin > 0 ? `あと${expiresInMin}分有効` : '期限切れ';
-                        statusDiv.innerHTML = `
-                            📊 キャッシュ: <strong>${data.userCount}人</strong> 
-                            (${data.totalProjects}プロジェクト)
-                            | 更新: ${timeStr} | ${expiresText}
-                        `;
+                        
+                        if (data.userCount > 0) {
+                            statusDiv.innerHTML = `
+                                📊 キャッシュ: <strong>${data.userCount}人</strong> 
+                                (${data.totalProjects}プロジェクト)
+                                | 更新: ${timeStr} | ${expiresText}
+                            `;
+                        } else {
+                            statusDiv.innerHTML = `
+                                📊 キャッシュ: <strong>0人</strong> 
+                                | 更新: ${timeStr} | ${expiresText}
+                                <span style="opacity: 0.7;"> (現在校舎にいる人はいません)</span>
+                            `;
+                        }
                         statusDiv.style.display = 'block';
                     } else {
-                        // キャッシュなし
+                        // キャッシュ未作成
                         statusDiv.innerHTML = `
                             ⚠️ キャッシュ未作成 
-                            <span style="opacity: 0.8;">検索または更新ボタンをクリックしてください</span>
+                            <span style="opacity: 0.8;">更新ボタンをクリックしてください</span>
                         `;
                         statusDiv.style.display = 'block';
                     }

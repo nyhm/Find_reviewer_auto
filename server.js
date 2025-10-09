@@ -90,7 +90,7 @@ async function getActiveUsers(token) {
     cacheProgress.current = 0;
     cacheProgress.message = '42Tokyo校舎の席情報を取得中...';
     
-    // locationsエンドポイントから現在校舎にいる人を取得（これが最も正確）
+    // locationsエンドポイントから現在ログイン中の人のみを取得
     const response = await axios.get(
       `https://api.intra.42.fr/v2/campus/26/locations`,
       {
@@ -102,9 +102,9 @@ async function getActiveUsers(token) {
       }
     );
     
-    // userがnullでない席から、ログイン名を抽出
+    // user != null かつ end_at == null（現在ログイン中）の人のみ
     const activeLogins = response.data
-      .filter(location => location.user !== null)
+      .filter(location => location.user !== null && location.end_at === null)
       .map(location => location.user.login);
     
     // 重複を削除
@@ -112,7 +112,7 @@ async function getActiveUsers(token) {
     users.push(...uniqueUsers);
     
     cacheProgress.current = 1;
-    console.log(`✅ 合計 ${users.length}人のアクティブユーザーを取得（42Tokyo校舎）`);
+    console.log(`✅ 合計 ${users.length}人のアクティブユーザーを取得（現在ログイン中）`);
   } catch (error) {
     console.error('ユーザー取得エラー:', error.message);
   }

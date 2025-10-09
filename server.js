@@ -77,7 +77,7 @@ async function getAccessToken(retryCount = 0) {
   }
 }
 
-// 現在校舎にいるユーザーを取得（並列処理版）
+// 現在校舎にいるユーザーを取得
 async function getActiveUsers(token) {
   const users = [];
   try {
@@ -88,68 +88,39 @@ async function getActiveUsers(token) {
     cacheProgress.total = 30; // 予想される最大ページ数
     cacheProgress.current = 0;
     
-    const PARALLEL_COUNT = 3; // 同時に3ページずつ取得
-    const MAX_PAGES = 100;
-    
-    for (let batchStart = 1; batchStart <= MAX_PAGES; batchStart += PARALLEL_COUNT) {
-      // 3ページ分のリクエストを並列実行
-      const pagePromises = [];
-      for (let i = 0; i < PARALLEL_COUNT && (batchStart + i) <= MAX_PAGES; i++) {
-        const page = batchStart + i;
-        pagePromises.push(
-          axios.get(
-            `https://api.intra.42.fr/v2/campus/26/users?page=${page}&per_page=100`,
-            {
-              headers: { 
-                'Authorization': `Bearer ${token}`,
-                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
-              },
-              timeout: 15000
-            }
-          ).then(response => ({ page, data: response.data }))
-           .catch(error => ({ page, data: [], error: error.message }))
-        );
-      }
+    // ページを順次取得
+    for (let page = 1; page <= 100; page++) {
+      cacheProgress.current = page;
+      cacheProgress.message = `ページ ${page} を取得中...`;
       
-      // 並列実行の結果を待つ
-      const results = await Promise.all(pagePromises);
-      
-      let hasData = false;
-      for (const result of results) {
-        if (result.error) {
-          console.log(`   ページ ${result.page}: エラー (${result.error})`);
-          continue;
+      const response = await axios.get(
+        `https://api.intra.42.fr/v2/campus/26/users?page=${page}&per_page=100`,
+        {
+          headers: { 
+            'Authorization': `Bearer ${token}`,
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+          },
+          timeout: 15000
         }
-        
-        if (result.data.length === 0) {
-          console.log(`   ページ ${result.page}: 0人 - 終了`);
-          continue;
-        }
-        
-        hasData = true;
-        
-        // 42Tokyo（campus 26）にいるユーザーのみを抽出
-        const activeUsers = result.data
-          .filter(user => {
-            if (!user.location) return false;
-            const tokyoCampus = user.campus_users?.find(cu => cu.campus_id === 26);
-            if (!tokyoCampus) return false;
-            return tokyoCampus.is_primary || user.location;
-          })
-          .map(user => user.login);
-        
-        users.push(...activeUsers);
-        console.log(`   ページ ${result.page}: ${activeUsers.length}人 (42Tokyo)`);
-        
-        cacheProgress.current = result.page;
-        cacheProgress.message = `ページ ${result.page} 完了`;
-      }
+      );
       
-      // 全てのページが空だったら終了
-      if (!hasData) break;
+      if (response.data.length === 0) break;
       
-      // レート制限対策（バッチ間の待機）
-      await new Promise(resolve => setTimeout(resolve, 800));
+      // 42Tokyo（campus 26）にいるユーザーのみを抽出
+      const activeUsers = response.data
+        .filter(user => {
+          if (!user.location) return false;
+          const tokyoCampus = user.campus_users?.find(cu => cu.campus_id === 26);
+          if (!tokyoCampus) return false;
+          return tokyoCampus.is_primary || user.location;
+        })
+        .map(user => user.login);
+      
+      users.push(...activeUsers);
+      console.log(`   ページ ${page}: ${activeUsers.length}人 (42Tokyo)`);
+      
+      // レート制限対策
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
     console.log(`✅ 合計 ${users.length}人のアクティブユーザーを取得`);
   } catch (error) {
@@ -191,59 +162,31 @@ async function updateCache() {
       cacheProgress.total = activeUserLogins.length;
       cacheProgress.current = 0;
       
-      const USER_PARALLEL_COUNT = 2; // 同時に2人ずつ処理
-      
-      for (let batchStart = 0; batchStart < activeUserLogins.length; batchStart += USER_PARALLEL_COUNT) {
-        // 2人分の処理を並列実行
-        const userPromises = [];
-        for (let i = 0; i < USER_PARALLEL_COUNT && (batchStart + i) < activeUserLogins.length; i++) {
-          const index = batchStart + i;
-          const login = activeUserLogins[index];
-          
-          userPromises.push(
-            (async () => {
-              try {
-                console.log(`  [${index + 1}/${activeUserLogins.length}] ${login}`);
-                cacheProgress.current = index + 1;
-                cacheProgress.message = `${login}のプロジェクト情報を取得中...`;
-                
-                const projects = await getUserProjects(token, login);
-                const userDetails = await getUserDetails(token, login);
-                
-                // 42Tokyoキャンパスの人のみ返す
-                if (userDetails.campus_id === 26 || userDetails.location) {
-                  return {
-                    login: login,
-                    projects: projects,
-                    image: userDetails.image,
-                    location: userDetails.location,
-                    displayName: userDetails.displayname || userDetails.usual_full_name || login,
-                    campus_id: userDetails.campus_id
-                  };
-                } else {
-                  console.log(`  ⚠️  ${login} は42Tokyo以外のキャンパス - スキップ`);
-                  return null;
-                }
-              } catch (error) {
-                console.error(`  ❌ ${login}: エラー (${error.message})`);
-                return null;
-              }
-            })()
-          );
+      for (let i = 0; i < activeUserLogins.length; i++) {
+        const login = activeUserLogins[i];
+        cacheProgress.current = i + 1;
+        cacheProgress.message = `${login}のプロジェクト情報を取得中...`;
+        console.log(`  [${i + 1}/${activeUserLogins.length}] ${login}`);
+        
+        const projects = await getUserProjects(token, login);
+        const userDetails = await getUserDetails(token, login);
+        
+        // 42Tokyoキャンパスの人のみを新しいキャッシュに追加
+        if (userDetails.campus_id === 26 || userDetails.location) {
+          newCache.push({
+            login: login,
+            projects: projects,
+            image: userDetails.image,
+            location: userDetails.location,
+            displayName: userDetails.displayname || userDetails.usual_full_name || login,
+            campus_id: userDetails.campus_id
+          });
+        } else {
+          console.log(`  ⚠️  ${login} は42Tokyo以外のキャンパス - スキップ`);
         }
         
-        // 並列処理の結果を待つ
-        const results = await Promise.all(userPromises);
-        
-        // nullでない結果のみをキャッシュに追加
-        for (const result of results) {
-          if (result) {
-            newCache.push(result);
-          }
-        }
-        
-        // レート制限対策（バッチ間の待機）
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // レート制限対策
+        await new Promise(resolve => setTimeout(resolve, 700));
       }
       
       // 進捗をリセット

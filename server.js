@@ -231,9 +231,12 @@ async function updateCache() {
 
 // キャッシュが有効かチェック
 function isCacheValid() {
-  if (!cacheLastUpdated || cachedUsersWithProjects.length === 0) {
+  // キャッシュが一度も作成されていない場合は無効
+  if (!cacheCreated || !cacheLastUpdated) {
     return false;
   }
+  
+  // 0人でもキャッシュが作成されていれば、期限内は有効
   const now = new Date();
   return (now - cacheLastUpdated) < CACHE_DURATION;
 }
@@ -422,12 +425,16 @@ app.get('/api/reviewers/:projectName', async (req, res) => {
     const projectName = decodeURIComponent(req.params.projectName);
     console.log(`\n🔍 検索開始: ${projectName}`);
     
-    // キャッシュが無効な場合は更新
+    // キャッシュが無効な場合のみ更新（0人でもキャッシュ作成済みなら更新しない）
     if (!isCacheValid()) {
-      console.log('⚠️  キャッシュが無効です。更新します...');
+      console.log('⚠️  キャッシュが無効または未作成です。更新します...');
       await updateCache();
     } else {
-      console.log(`✅ キャッシュを使用 (${cachedUsersWithProjects.length}人)`);
+      if (cachedUsersWithProjects.length === 0) {
+        console.log(`ℹ️  キャッシュは有効です（現在アクティブユーザーが0人）`);
+      } else {
+        console.log(`✅ キャッシュを使用 (${cachedUsersWithProjects.length}人)`);
+      }
     }
     
     const startTime = Date.now();

@@ -1,0 +1,23 @@
+{
+  "name": "findreviewer",
+  "version": "1.0.0",
+  "description": "42Tokyo校舎内の学生から課題完了者を検索するWebアプリ",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "42",
+    "reviewer",
+    "api"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "dotenv": "^16.3.1",
+    "axios": "^1.6.0"
+  }
+}
+

@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: findreviewer
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 3000
+      - key: U_ID
+        sync: false
+      - key: SECRET
+        sync: false
+

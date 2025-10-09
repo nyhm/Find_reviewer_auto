@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>42Tokyo レビュワー検索</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔍 42Tokyo レビュワー検索</h1>
+            <p class="subtitle">校舎内にいる課題が終わっている人を探す</p>
+            <div id="cacheStatus" class="cache-status"></div>
+        </header>
+
+        <main>
+            <div class="search-section">
+                <div class="input-group">
+                    <label for="projectSelect">課題を選択:</label>
+                    <select id="projectSelect" disabled>
+                        <option value="">読み込み中...</option>
+                    </select>
+                </div>
+                
+                <button id="searchBtn" disabled>
+                    🔍 検索
+                </button>
+                
+                <button id="refreshCacheBtn" class="refresh-btn" title="キャッシュを手動更新">
+                    🔄 更新
+                </button>
+            </div>
+
+            <div id="loadingIndicator" class="loading" style="display: none;">
+                <div class="spinner"></div>
+                <p>検索中です...</p>
+                <p class="loading-note">※キャッシュから検索しています</p>
+            </div>
+
+            <div id="results" class="results" style="display: none;">
+                <div class="results-header">
+                    <h2 id="resultsTitle"></h2>
+                    <div>
+                        <span id="resultsCount" class="count-badge"></span>
+                        <span id="searchDuration" class="duration-badge"></span>
+                    </div>
+                </div>
+                
+                <div id="reviewersList" class="reviewers-list"></div>
+            </div>
+
+            <div id="errorMessage" class="error" style="display: none;"></div>
+        </main>
+
+        <footer>
+            <p>
+                現在校舎にログイン中の学生から、選択した課題が<strong>一度でも終わっている人（finished）</strong>を表示します
+            </p>
+            <p class="note">
+                ✅ statusが"finished"なら点数に関係なく表示 | ⚡️ 検索は数ミリ秒で完了
+            </p>
+        </footer>
+    </div>
+
+    <script>
+        let projects = [];
+
+        // ページ読み込み時に課題リストを取得
+        async function loadProjects() {
+            try {
+                const response = await fetch('/api/projects');
+                const data = await response.json();
+                projects = data.projects;
+                
+                const select = document.getElementById('projectSelect');
+                select.innerHTML = '<option value="">課題を選択してください</option>';
+                
+                projects.forEach(project => {
+                    const option = document.createElement('option');
+                    option.value = project;
+                    option.textContent = project;
+                    select.appendChild(option);
+                });
+                
+                select.disabled = false;
+                document.getElementById('searchBtn').disabled = false;
+            } catch (error) {
+                showError('課題リストの読み込みに失敗しました');
+                console.error(error);
+            }
+        }
+
+        // キャッシュ状態を取得して表示
+        async function updateCacheStatus() {
+            try {
+                const response = await fetch('/api/cache/status');
+                const data = await response.json();
+                
+                const statusDiv = document.getElementById('cacheStatus');
+                if (data.userCount > 0) {
+                    const lastUpdated = new Date(data.lastUpdated);
+                    const timeStr = lastUpdated.toLocaleTimeString('ja-JP');
+                    statusDiv.innerHTML = `
+                        📊 キャッシュ: <strong>${data.userCount}人</strong> 
+                        (${data.totalProjects}プロジェクト)
+                        | 更新: ${timeStr}
+                    `;
+                    statusDiv.style.display = 'block';
+                }
+            } catch (error) {
+                console.error('キャッシュ状態の取得に失敗:', error);
+            }
+        }
+
+        // キャッシュを手動更新
+        async function refreshCache() {
+            const btn = document.getElementById('refreshCacheBtn');
+            btn.disabled = true;
+            btn.textContent = '🔄 更新中...';
+            
+            try {
+                const response = await fetch('/api/cache/refresh', {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    await updateCacheStatus();
+                    showError('✅ キャッシュを更新しました（' + data.userCount + '人、' + data.totalProjects + 'プロジェクト）');
+                    setTimeout(() => hideError(), 3000);
+                } else {
+                    showError('キャッシュの更新に失敗しました');
+                }
+            } catch (error) {
+                showError('キャッシュの更新に失敗しました');
+                console.error(error);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🔄 更新';
+            }
+        }
+
+        // レビュワーを検索
+        async function searchReviewers() {
+            const projectName = document.getElementById('projectSelect').value;
+            
+            if (!projectName) {
+                showError('課題を選択してください');
+                return;
+            }
+
+            // UI更新
+            hideError();
+            hideResults();
+            showLoading();
+            document.getElementById('searchBtn').disabled = true;
+
+            try {
+                const response = await fetch(`/api/reviewers/${encodeURIComponent(projectName)}`);
+                const data = await response.json();
+
+                if (response.ok) {
+                    displayResults(data);
+                } else {
+                    showError(data.error || 'エラーが発生しました');
+                }
+            } catch (error) {
+                showError('サーバーとの通信に失敗しました');
+                console.error(error);
+            } finally {
+                hideLoading();
+                document.getElementById('searchBtn').disabled = false;
+            }
+        }
+
+        // 結果を表示
+        function displayResults(data) {
+            const resultsDiv = document.getElementById('results');
+            const titleDiv = document.getElementById('resultsTitle');
+            const countDiv = document.getElementById('resultsCount');
+            const durationDiv = document.getElementById('searchDuration');
+            const listDiv = document.getElementById('reviewersList');
+
+            titleDiv.textContent = `📚 ${data.project}`;
+            countDiv.textContent = `${data.count}人`;
+            
+            // 検索速度を表示
+            if (data.searchDuration !== undefined) {
+                durationDiv.textContent = `⚡️ ${data.searchDuration}ms`;
+                durationDiv.style.display = 'inline-block';
+            } else {
+                durationDiv.style.display = 'none';
+            }
+
+            listDiv.innerHTML = '';
+
+            if (data.reviewers.length === 0) {
+                listDiv.innerHTML = '<p class="no-results">現在校舎内に課題が終わっている人がいません 😢</p>';
+            } else {
+                data.reviewers.forEach(reviewer => {
+                    const card = document.createElement('div');
+                    card.className = 'reviewer-card';
+                    
+                    const validated = reviewer.validated ? '✅' : '';
+                    const statusBadge = '<span class="status-finished">完了</span>';
+                    
+                    card.innerHTML = `
+                        <div class="reviewer-login">${reviewer.login}</div>
+                        <div class="reviewer-score">
+                            ${statusBadge} ${validated} ${reviewer.finalMark}点
+                        </div>
+                    `;
+                    
+                    listDiv.appendChild(card);
+                });
+            }
+
+            // キャッシュ情報を更新
+            if (data.cacheInfo) {
+                updateCacheStatus();
+            }
+
+            resultsDiv.style.display = 'block';
+        }
+
+        // ローディング表示
+        function showLoading() {
+            document.getElementById('loadingIndicator').style.display = 'block';
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingIndicator').style.display = 'none';
+        }
+
+        // 結果非表示
+        function hideResults() {
+            document.getElementById('results').style.display = 'none';
+        }
+
+        // エラー表示
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+        function hideError() {
+            document.getElementById('errorMessage').style.display = 'none';
+        }
+
+        // イベントリスナー
+        document.getElementById('searchBtn').addEventListener('click', searchReviewers);
+        document.getElementById('refreshCacheBtn').addEventListener('click', refreshCache);
+        
+        document.getElementById('projectSelect').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                searchReviewers();
+            }
+        });
+
+        // 初期化
+        loadProjects();
+        updateCacheStatus();
+        
+        // 定期的にキャッシュ状態を更新（30秒ごと）
+        setInterval(updateCacheStatus, 30000);
+    </script>
+</body>
+</html>
+

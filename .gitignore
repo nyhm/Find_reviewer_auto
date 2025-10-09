@@ -1,0 +1,12 @@
+node_modules/
+.env
+reviewer.txt
+npm-debug.log
+.DS_Store
+
+# Vercel
+.vercel
+
+# Local development
+*.log
+

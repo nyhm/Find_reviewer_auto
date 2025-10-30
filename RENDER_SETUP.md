@@ -95,8 +95,8 @@ cat .env
 
 出力例：
 ```
-U_ID="u-s4t2ud-eec5211b7f09451569941fb576db381d29912a2f7ff01c2658556f189bcdb010"
-SECRET="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"
+U_ID="u-s0"
+SECRET="s-s4t"
 ```
 
 この値をコピーしてRenderに貼り付けてください（引用符は不要）

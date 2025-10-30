@@ -42,10 +42,10 @@ API_SECRET = ... ← SECRETではない
 
 ```
 Key: U_ID
-Value: u-s4t2ud-eec5211b7f09451569941fb576db381d29912a2f7ff01c2658556f189bcdb010
+Value: u-s4t2
 
 Key: SECRET
-Value: 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
+Value: s-s4t2u
 
 Key: PORT
 Value: 3000
@@ -70,14 +70,14 @@ Value: 3000
 **U_ID を追加：**
 ```
 Key: U_ID
-Value: u-s4t2ud-eec5211b7f09451569941fb576db381d29912a2f7ff01c2658556f189bcdb010
+Value: u-s4t2ud-
 ```
 **引用符を絶対に入れない！**
 
 **SECRET を追加：**
 ```
 Key: SECRET
-Value: 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
+Value: s-s4t2u
 ```
 **引用符を絶対に入れない！**
 
@@ -125,8 +125,8 @@ cat .env
 # APIキーのテスト（成功することを確認済み）
 curl -s -X POST https://api.intra.42.fr/oauth/token \
   -d "grant_type=client_credentials" \
-  -d "client_id=u-s4t2ud-eec5211b7f09451569941fb576db381d29912a2f7ff01c2658556f189bcdb010" \
-  -d "client_secret=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"
+  -d "client_id=u-s4" \
+  -d "client_secret=s-s4t2ud-"
 ```
 
 → ローカルでは成功するので、**APIキーは有効**
@@ -145,16 +145,16 @@ cat .env
 
 出力例：
 ```
-U_ID="u-s4t2ud-eec5211b7f09451569941fb576db381d29912a2f7ff01c2658556f189bcdb010"
-SECRET="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"
+U_ID="u-s4t2ud-eec5211b7f09451560"
+SECRET="s-s4t2ud-be1a1500"
 PORT=3000
 ```
 
 ### Renderに入力する値（引用符を削除）
 
 ```
-U_ID の値: u-s4t2ud-eec5211b7f09451569941fb576db381d29912a2f7ff01c2658556f189bcdb010
-SECRET の値: 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
+U_ID の値: u-s4t2ud-eec5211b7f09451510
+SECRET の値: s-s4t2ud-be1a157be5e230c0
 ```
 
 **注意：** 引用符（"）は**含めない**
@@ -190,10 +190,10 @@ SECRET の値: s-s4t2ud-be1a157be5e230c8400f87b20eaa9d3f7fd84bb15082956597c98ee0
 
 ```
 Key: U_ID
-Value: u-s4t2ud-eec5211b7f09451569941fb576db381d29912a2f7ff01c2658556f189bcdb010
+Value: u-s4t2ud-eec
 
 Key: SECRET
-Value: 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
+Value: s-s4t2ud-be1a157be5e230c8400f8
 ```
 
 3. **Save Changes**

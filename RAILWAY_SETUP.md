@@ -35,8 +35,8 @@ Railway.appはCloudflareとの相性が良く、42 APIへのアクセスが成�
 3. 「**New Variable**」で以下を追加：
 
 ```
-U_ID = u-s4t2ud-eec5211b7f09451569941fb576db381d29912a2f7ff01c2658556f189bcdb010
-SECRET = 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
+U_ID = u-s4t2ud-
+SECRET = s-s4t2ud
 PORT = 3000
 ```
 
